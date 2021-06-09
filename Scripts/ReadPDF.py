@@ -1,4 +1,4 @@
-import sys
+import glob
 
 from tika import parser
 from pdfreader import SimplePDFViewer, PageDoesNotExist
@@ -38,7 +38,7 @@ def pdfread(filename):
 
 
 def main():
-    file = sys.argv[0]
+    file = glob.glob('./../Patient_data/*.pdf')[0]
     words = pdfread(file)
     lines = tika(file)
 
@@ -71,7 +71,7 @@ def main():
         if len(pages[0][2][6].split('/')) != 2:
             pages[0][2].insert(6, '-')
 
-    with open('../../Data/person1.csv', 'w') as file:
+    with open('./../temp/health_data.csv', 'w') as file:
         for p in pages:
             for r in p:
                 file.write(f"{','.join(r)}\n")
