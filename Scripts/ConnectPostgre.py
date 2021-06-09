@@ -1,7 +1,14 @@
+"""
+Get (mapped) health and SNP data and put these in an Postgre SQL database.
+"""
 import psycopg2
 
 
 def connect():
+    """
+    Makes a connection with the Postgre SQL database
+    :return: The connection and cursor objects.
+    """
     conn = psycopg2.connect(
         host='145.74.104.145',
         database='postgres',
@@ -15,11 +22,11 @@ def connect():
 def getcsv():
     """
     Get the csv file containing the health data of a person
-    :return:
+    :return: A dictionary containing all health data from a person.
     """
     health_data = {}
     keys = False
-    with open('../../Data/person1.csv') as file:
+    with open('./../temp/health_data.csv') as file:
         for line in file.readlines():
             line = line.strip().split(',')
             if keys:
@@ -49,10 +56,9 @@ def getvcf():
 def insert_health_data(cur, health_data, person_id):
     """
     Inserts a persons health data into the database
-    :param health_data:
-    :param cur:
-    :param person_id:
-    :return:
+    :param health_data: A dictionary containing all health data from a person.
+    :param cur: A cursor object.
+    :param person_id: int. This is the latest person_id in the database + 1.
     """
     # Check if person is in database
     cur.execute("""SELECT person_id FROM person
@@ -70,23 +76,24 @@ def insert_health_data(cur, health_data, person_id):
     elif health_data['Sex'][0] == 'F':
         sex = 2
 
-    # cur.execute("""INSERT INTO person(person_id, person_source_value,
-    #                                 gender_concept_id, gender_source_value,
-    #                                 year_of_birth, month_of_birth,
-    #                                 ethnicity_concept_id, ethnicity_source_value,
-    #                                 race_concept_id
-    #                                 ) VALUES (%s, %s,
-    #                                 %s, %s,
-    #                                 %s, %s,
-    #                                 %s, %s,
-    #                                 %s)""",
-    #                                 (person_id, health_data['Participant'][0],
-    #                                  sex, health_data['Sex'][0],
-    #                                  health_data['Birth year'][0], health_data['Birth month'][0],
-    #                                  [hier moet race concept id in type int], health_data['Ethnicity'][0],
-    #                                  0
-    # ))
+    cur.execute("""INSERT INTO person(person_id, person_source_value,
+                                    gender_concept_id, gender_source_value,
+                                    year_of_birth, month_of_birth,
+                                    ethnicity_concept_id, ethnicity_source_value,
+                                    race_concept_id
+                                    ) VALUES (%s, %s,
+                                    %s, %s,
+                                    %s, %s,
+                                    %s, %s,
+                                    %s)""",
+                                    (person_id, health_data['Participant'][0],
+                                     sex, health_data['Sex'][0],
+                                     health_data['Birth year'][0], health_data['Birth month'][0],
+                                     [hier moet race concept id in type int], health_data['Ethnicity'][0],
+                                     0
+    ))
 
+    # Check if the person has any conditions
     conditions = []
     if health_data.get('Conditions or Symptom') is not None:
         conditions.extend(health_data['Conditions or Symptom'])
@@ -95,30 +102,31 @@ def insert_health_data(cur, health_data, person_id):
 
     condition_id = get_occurrence_id(cur)
 
-    # for condition in conditions:
-    #     cur.execute("""INSERT INTO condition_occurrence(condition_occurrence_id, person_id,
-    #                                                     condition_type_concept_id,
-    #                                                     condition_concept_id, condition_source_value,
-    #                                                     condition_start_date
-    #                                                     ) VALUES (%s, %s,
-    #                                                     %s,
-    #                                                     %s, %s,
-    #                                                     %s)""",
-    #                                                     (condition_id, person_id,
-    #                                                      0,
-    #                                                      [hier moet condition concept id in type int], condition,
-    #                                                      '0001-01-01'))
-    #     condition_id += 1
+    Add conditions to the database
+    for condition in conditions:
+        cur.execute("""INSERT INTO condition_occurrence(condition_occurrence_id, person_id,
+                                                        condition_type_concept_id,
+                                                        condition_concept_id, condition_source_value,
+                                                        condition_start_date
+                                                        ) VALUES (%s, %s,
+                                                        %s,
+                                                        %s, %s,
+                                                        %s)""",
+                                                        (condition_id, person_id,
+                                                         0,
+                                                         [hier moet condition concept id in type int], condition,
+                                                         '0001-01-01'))
+        condition_id += 1
 
     # https://ohdsi.github.io/CommonDataModel/cdm531.html#CONDITION_OCCURRENCE
 
 
 def insert_snp_data(cur, snps, person_id):
     """
-    Inserts a persons snp data into the databse
-    :param cur:
+    Inserts a persons snp data into the database
+    :param cur: A cursor object.
     :param snps:
-    :param person_id:
+    :param person_id: int. This is the latest person_id in the database + 1.
     :return:
     """
     measurement_id = get_measurement_id(cur)
@@ -156,17 +164,22 @@ def insert_snp_data(cur, snps, person_id):
                                                 
 
 
-                                                ) VALUES (%s, %s,
-                                                %s,
-                                                %s, %s,
-                                                %s)""",
-                                                (condition_id, person_id,
-                                                 0,
-                                                 [hier moet condition concept id in type int], condition,
-                                                 '0001-01-01'))
+                                                # ) VALUES (%s, %s,
+                                                # %s,
+                                                # %s, %s,
+                                                # %s)""",
+                                                # (condition_id, person_id,
+                                                #  0,
+                                                #  [hier moet condition concept id in type int], condition,
+                                                #  '0001-01-01'))
 
 
 def get_person_id(cur):
+    """
+    Retrieves the latest person_id from the person table and adds 1. If nothing is in the database, returns 0.
+    :param cur: A cursor object.
+    :return: The latest person_id from the person table + 1. If no person_id is present, returns 0
+    """
     cur.execute('SELECT person_id FROM person '
                 'ORDER BY person_id DESC '
                 'LIMIT 1')
@@ -178,6 +191,12 @@ def get_person_id(cur):
 
 
 def get_occurrence_id(cur):
+    """
+    Retrieves the latest occurrence_id from the condition_occurrence table and adds 1. 
+    If nothing is in the database, returns 0.
+    :param cur: A cursor object.
+    :return: The latest occurrence_id from the condition_occurrence table + 1. If no occurrence_id is present, returns 0
+    """
     cur.execute('SELECT condition_occurrence_id FROM condition_occurrence '
                 'ORDER BY condition_occurrence_id DESC '
                 'LIMIT 1')
@@ -188,6 +207,11 @@ def get_occurrence_id(cur):
 
 
 def get_measurement_id(cur):
+    """
+    Retrieves the latest measurement_id from the measurement table and adds 1. If nothing is in the database, returns 0.
+    :param cur: A cursor object.
+    :return: The latest measurement_id from the measurement table + 1. If no measurement_id is present, returns 0
+    """
     cur.execute('SELECT measurement_id FROM measurement '
                 'ORDER BY measurement_id DESC '
                 'LIMIT 1')
@@ -196,6 +220,9 @@ def get_measurement_id(cur):
 
 
 def main():
+    """
+    Calls all other functions.
+    """
     conn, cur = connect()
 
     health = getcsv()
@@ -206,23 +233,9 @@ def main():
     insert_health_data(cur, health, person_id)
     insert_snp_data(cur, snps, person_id)
 
-
-    # sql = """INSERT INTO vendors(vendor_name)     # voorbeeld sql statement voor in tabel zetten
-    #       VALUES(%s) RETURNING vendor_id;"""
-    # cur.execute(sql, (value1, value2))            # data in database zetten
-    # cur.commit()                                  # permanently changes database
-
-    # respone = cur.fetchone()
-    # respone = cur.fetchmany(size=4)
-    # respone = cur.fetchall()
-
     conn.commit()
     conn.close()
 
 
 if __name__ == '__main__':
     main()
-
-
-# source value = waarde in data (wat in pdf staat)
-# andere values = waarde van OMOP
